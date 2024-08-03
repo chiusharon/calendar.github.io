@@ -73,18 +73,6 @@
         #contextMenu button:hover {
             background-color: #e9e9e9;
         }
-        #passwordPrompt {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: white;
-            padding: 20px;
-            border: 1px solid #ccc;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            z-index: 1001;
-        }
     </style>
 </head>
 <body>
@@ -126,13 +114,6 @@
         <button id="deleteEvent">刪除事件</button>
     </div>
 
-    <div id="passwordPrompt">
-        <h3>請輸入管理者密碼</h3>
-        <input type="password" id="adminPassword">
-        <button onclick="verifyPassword()">確認</button>
-        <button onclick="cancelAdminLogin()">取消</button>
-    </div>
-
     <script>
         const calendar = document.getElementById('calendar');
         const monthSelect = document.getElementById('monthSelect');
@@ -140,11 +121,9 @@
         const contextMenu = document.getElementById('contextMenu');
         const userRole = document.getElementById('userRole');
         const adminControls = document.getElementById('adminControls');
-        const passwordPrompt = document.getElementById('passwordPrompt');
         const events = {};
         const currentYear = new Date().getFullYear();
         let selectedEvent = null;
-        const adminPassword = "1234"; // 設置管理者密碼
 
         // 初始化月份選擇
         for (let i = 0; i < 12; i++) {
@@ -266,30 +245,12 @@
         // 用戶角色切換功能
         userRole.addEventListener('change', function() {
             if (this.value === 'admin') {
-                passwordPrompt.style.display = 'block';
+                adminControls.style.display = 'block';
             } else {
                 adminControls.style.display = 'none';
-                generateCalendar(currentYear, parseInt(monthSelect.value));
             }
+            generateCalendar(currentYear, parseInt(monthSelect.value));
         });
-
-        function verifyPassword() {
-            const enteredPassword = document.getElementById('adminPassword').value;
-            if (enteredPassword === adminPassword) {
-                adminControls.style.display = 'block';
-                passwordPrompt.style.display = 'none';
-                generateCalendar(currentYear, parseInt(monthSelect.value));
-            } else {
-                alert('密碼錯誤！');
-                userRole.value = 'viewer';
-            }
-            document.getElementById('adminPassword').value = '';
-        }
-
-        function cancelAdminLogin() {
-            passwordPrompt.style.display = 'none';
-            userRole.value = 'viewer';
-        }
 
         // 初始化顯示當前月份的行事曆
         const currentMonth = new Date().getMonth();
