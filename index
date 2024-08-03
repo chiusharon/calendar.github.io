@@ -1,0 +1,309 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>年度班級行事曆</title>
+    <style>
+        @import url('https://fonts.googleapis.com/earlyaccess/cwtexkai.css');
+        body {
+            font-family: 'cwTeXKai', '標楷體', DFKai-SB, BiauKai, 'Microsoft JhengHei', sans-serif;
+            transition: background-color 0.5s, color 0.5s;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+            width: 14.28%;
+            height: 100px;
+            overflow: hidden;
+        }
+        th {
+            background-color: #f2f2f2;
+            text-align: center;
+        }
+        .date {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .event {
+            background-color: #ffeb3b;
+            border-radius: 3px;
+            padding: 2px;
+            margin: 2px 0;
+            font-size: 0.8em;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            cursor: pointer;
+        }
+        .event:hover {
+            background-color: #ffd700;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        #eventText {
+            width: 300px;
+            height: 100px;
+        }
+        #contextMenu {
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            border: 1px solid #ccc;
+            padding: 5px;
+            z-index: 1000;
+        }
+        #contextMenu button {
+            display: block;
+            width: 100%;
+            padding: 5px;
+            text-align: left;
+            border: none;
+            background: none;
+            cursor: pointer;
+        }
+        #contextMenu button:hover {
+            background-color: #e9e9e9;
+        }
+        #passwordPrompt {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1001;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <label for="userRole">用戶角色：</label>
+        <select id="userRole">
+            <option value="viewer">普通用戶</option>
+            <option value="admin">管理者</option>
+        </select>
+        <label for="bgColor">背景顏色：</label>
+        <input type="color" id="bgColor" value="#ffffff">
+        <label for="textColor">文字顏色：</label>
+        <input type="color" id="textColor" value="#000000">
+        <label for="monthSelect">選擇月份：</label>
+        <select id="monthSelect"></select>
+    </div>
+    <h1 id="calendarTitle"></h1>
+    <table id="calendar">
+        <tr>
+            <th>週日</th>
+            <th>週一</th>
+            <th>週二</th>
+            <th>週三</th>
+            <th>週四</th>
+            <th>週五</th>
+            <th>週六</th>
+        </tr>
+    </table>
+
+    <div id="adminControls" style="display: none;">
+        <h2>添加事件</h2>
+        <input type="date" id="eventDate">
+        <input type="time" id="eventTime">
+        <textarea id="eventText" placeholder="事件描述（可按Enter換行）"></textarea>
+        <button onclick="addEvent()">添加事件</button>
+    </div>
+
+    <div id="contextMenu">
+        <button id="deleteEvent">刪除事件</button>
+    </div>
+
+    <div id="passwordPrompt">
+        <h3>請輸入管理者密碼</h3>
+        <input type="password" id="adminPassword">
+        <button onclick="verifyPassword()">確認</button>
+        <button onclick="cancelAdminLogin()">取消</button>
+    </div>
+
+    <script>
+        const calendar = document.getElementById('calendar');
+        const monthSelect = document.getElementById('monthSelect');
+        const calendarTitle = document.getElementById('calendarTitle');
+        const contextMenu = document.getElementById('contextMenu');
+        const userRole = document.getElementById('userRole');
+        const adminControls = document.getElementById('adminControls');
+        const passwordPrompt = document.getElementById('passwordPrompt');
+        const events = {};
+        const currentYear = new Date().getFullYear();
+        let selectedEvent = null;
+        const adminPassword = "1234"; // 設置管理者密碼
+
+        // 初始化月份選擇
+        for (let i = 0; i < 12; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `${i + 1}月`;
+            monthSelect.appendChild(option);
+        }
+
+        function generateCalendar(year, month) {
+            // 清空日曆
+            while (calendar.rows.length > 1) {
+                calendar.deleteRow(1);
+            }
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            calendarTitle.textContent = `${year}年${month + 1}月 班級行事曆`;
+
+            let date = 1;
+            for (let i = 0; i < 6; i++) {
+                const row = calendar.insertRow();
+                for (let j = 0; j < 7; j++) {
+                    const cell = row.insertCell();
+                    if (i === 0 && j < firstDay) {
+                        cell.innerHTML = '<div class="date"></div>';
+                    } else if (date > daysInMonth) {
+                        cell.innerHTML = '<div class="date"></div>';
+                    } else {
+                        cell.innerHTML = `<div class="date">${date}</div>`;
+                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+                        if (events[dateStr]) {
+                            events[dateStr].forEach((event, index) => {
+                                const eventDiv = document.createElement('div');
+                                eventDiv.className = 'event';
+                                eventDiv.textContent = event.time ? `${event.time} ${event.text}` : event.text;
+                                if (userRole.value === 'admin') {
+                                    eventDiv.dataset.date = dateStr;
+                                    eventDiv.dataset.index = index;
+                                    eventDiv.addEventListener('contextmenu', showContextMenu);
+                                }
+                                cell.appendChild(eventDiv);
+                            });
+                        }
+                        date++;
+                    }
+                }
+                if (date > daysInMonth) break;
+            }
+        }
+
+        function addEvent() {
+            if (userRole.value !== 'admin') return;
+            const date = document.getElementById('eventDate').value;
+            const time = document.getElementById('eventTime').value;
+            const text = document.getElementById('eventText').value;
+            if (date && text) {
+                if (!events[date]) {
+                    events[date] = [];
+                }
+                events[date].push({ time, text });
+                // 按時間排序事件
+                events[date].sort((a, b) => {
+                    if (!a.time) return 1;
+                    if (!b.time) return -1;
+                    return a.time.localeCompare(b.time);
+                });
+                const [year, month] = date.split('-').map(Number);
+                generateCalendar(year, month - 1);
+                // 清空輸入欄位
+                document.getElementById('eventTime').value = '';
+                document.getElementById('eventText').value = '';
+            }
+        }
+
+        function showContextMenu(e) {
+            if (userRole.value !== 'admin') return;
+            e.preventDefault();
+            selectedEvent = e.target;
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = `${e.pageX}px`;
+            contextMenu.style.top = `${e.pageY}px`;
+        }
+
+        function hideContextMenu() {
+            contextMenu.style.display = 'none';
+        }
+
+        function deleteEvent() {
+            if (userRole.value !== 'admin') return;
+            if (selectedEvent) {
+                const date = selectedEvent.dataset.date;
+                const index = parseInt(selectedEvent.dataset.index);
+                events[date].splice(index, 1);
+                if (events[date].length === 0) {
+                    delete events[date];
+                }
+                const [year, month] = date.split('-').map(Number);
+                generateCalendar(year, month - 1);
+            }
+            hideContextMenu();
+        }
+
+        // 顏色選擇功能
+        document.getElementById('bgColor').addEventListener('input', function(e) {
+            document.body.style.backgroundColor = e.target.value;
+        });
+
+        document.getElementById('textColor').addEventListener('input', function(e) {
+            document.body.style.color = e.target.value;
+        });
+
+        // 月份選擇功能
+        monthSelect.addEventListener('change', function() {
+            generateCalendar(currentYear, parseInt(this.value));
+        });
+
+        // 用戶角色切換功能
+        userRole.addEventListener('change', function() {
+            if (this.value === 'admin') {
+                passwordPrompt.style.display = 'block';
+            } else {
+                adminControls.style.display = 'none';
+                generateCalendar(currentYear, parseInt(monthSelect.value));
+            }
+        });
+
+        function verifyPassword() {
+            const enteredPassword = document.getElementById('adminPassword').value;
+            if (enteredPassword === adminPassword) {
+                adminControls.style.display = 'block';
+                passwordPrompt.style.display = 'none';
+                generateCalendar(currentYear, parseInt(monthSelect.value));
+            } else {
+                alert('密碼錯誤！');
+                userRole.value = 'viewer';
+            }
+            document.getElementById('adminPassword').value = '';
+        }
+
+        function cancelAdminLogin() {
+            passwordPrompt.style.display = 'none';
+            userRole.value = 'viewer';
+        }
+
+        // 初始化顯示當前月份的行事曆
+        const currentMonth = new Date().getMonth();
+        monthSelect.value = currentMonth;
+        generateCalendar(currentYear, currentMonth);
+
+        // 添加刪除事件的監聽器
+        document.getElementById('deleteEvent').addEventListener('click', deleteEvent);
+
+        // 點擊其他地方時隱藏上下文菜單
+        document.addEventListener('click', hideContextMenu);
+
+        // 初始化用戶角色
+        userRole.dispatchEvent(new Event('change'));
+    </script>
+</body>
+</html>
