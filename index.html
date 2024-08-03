@@ -1,0 +1,124 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>年度班級行事曆</title>
+    <style>
+        /* 保留原有的樣式 */
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <label for="userRole">用戶角色：</label>
+        <select id="userRole">
+            <option value="viewer">普通用戶</option>
+            <option value="admin">管理者</option>
+        </select>
+        <!-- 其他控制項 -->
+    </div>
+    <!-- 保留其他 HTML 元素 -->
+
+    <div id="passwordPrompt">
+        <h3>請輸入管理者密碼</h3>
+        <input type="text" id="adminUsername" placeholder="用戶名">
+        <input type="password" id="adminPassword" placeholder="密碼">
+        <button onclick="verifyPassword()">確認</button>
+        <button onclick="cancelAdminLogin()">取消</button>
+    </div>
+
+    <script>
+        // 保留大部分原有的 JavaScript 代碼
+
+        // 修改 verifyPassword 函數
+        async function verifyPassword() {
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+
+            try {
+                const response = await fetch('http://localhost:3000/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('token', data.token);
+                    adminControls.style.display = 'block';
+                    passwordPrompt.style.display = 'none';
+                    generateCalendar(currentYear, parseInt(monthSelect.value));
+                } else {
+                    alert('用戶名或密碼錯誤！');
+                    userRole.value = 'viewer';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('登錄失敗，請稍後再試。');
+                userRole.value = 'viewer';
+            }
+
+            document.getElementById('adminUsername').value = '';
+            document.getElementById('adminPassword').value = '';
+        }
+
+        // 添加一個函數來檢查用戶是否已登錄
+        function checkAuthentication() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                fetch('http://localhost:3000/protected', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        adminControls.style.display = 'block';
+                        userRole.value = 'admin';
+                    } else {
+                        throw new Error('Authentication failed');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    localStorage.removeItem('token');
+                    userRole.value = 'viewer';
+                });
+            }
+        }
+
+        // 在頁面加載時檢查認證狀態
+        window.addEventListener('load', checkAuthentication);
+
+        // 修改用戶角色切換功能
+        userRole.addEventListener('change', function() {
+            if (this.value === 'admin') {
+                const token = localStorage.getItem('token');
+                if (token) {
+                    adminControls.style.display = 'block';
+                } else {
+                    passwordPrompt.style.display = 'block';
+                }
+            } else {
+                adminControls.style.display = 'none';
+                generateCalendar(currentYear, parseInt(monthSelect.value));
+            }
+        });
+
+        // 添加登出功能
+        function logout() {
+            localStorage.removeItem('token');
+            userRole.value = 'viewer';
+            adminControls.style.display = 'none';
+            generateCalendar(currentYear, parseInt(monthSelect.value));
+        }
+
+        // 在適當的位置添加登出按鈕
+        // 例如，在 adminControls 中添加：
+        // <button onclick="logout()">登出</button>
+
+    </script>
+</body>
+</html>
